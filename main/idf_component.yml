@@ -1,0 +1,5 @@
+# Managed component dependencies for the jig main component
+# This will automatically fetch TinyUSB if it's not bundled in your ESP-IDF
+
+dependencies:
+  idf: ">=5.0"

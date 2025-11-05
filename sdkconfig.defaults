@@ -1,0 +1,4 @@
+# Defaults for USB-Serial-JTAG bridge (no TinyUSB dependency)
+# No special config needed for most cases. Keep file for future overrides.
+CONFIG_TINYUSB_ENABLED=n
+CONFIG_TINYUSB_CDC_ENABLED=n
