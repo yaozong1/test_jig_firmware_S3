@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "test_jig",
-    "project_version":    "2f5b154-dirty",
+    "project_version":    "8b4596d-dirty",
     "project_path":       "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware",
     "idf_path":           "C:/Users/h1576/esp/esp-idf",
     "build_dir":          "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build",
@@ -739,12 +739,12 @@
             "dir": "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/main",
             "type": "LIBRARY",
             "lib": "__idf_main",
-            "reqs": [ "driver", "usb" ],
+            "reqs": [ "driver", "esp_timer", "freertos" ],
             "priv_reqs": [],
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build/esp-idf/main/libmain.a",
-            "sources": [ "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/main/main.c" ],
+            "sources": [ "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/main/main_simple.c", "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/main/main.c" ],
             "include_dirs": [ "." ]
         },
         "mbedtls": {

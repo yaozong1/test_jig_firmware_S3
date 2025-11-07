@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Simplified Jig firmware: Only control EN/IO0, CH340 directly connected to DUT
+// Simplified Jig firmware: Only control EN/IO0, no UART bridge needed
 
 #include <stdio.h>
 #include <string.h>
@@ -32,7 +32,7 @@ static void console_task(void *arg)
 {
     uint8_t b;
     char cmd[32]; int len = 0; int in_cmd = 0;
-    usj_write("JIG: READY (Control-only, CH340 directly to DUT)\r\n");
+    usj_write("JIG: READY (Control-only mode, CH340 directly connected to DUT)\r\n");
     while (1) {
         int r = usb_serial_jtag_read_bytes(&b, 1, 10);
         if (r > 0) {
@@ -50,7 +50,7 @@ static void console_task(void *arg)
                         vTaskDelay(pdMS_TO_TICKS(5));
                         gpio_set_level(DUT_EN_PIN, 1);
                         vTaskDelay(pdMS_TO_TICKS(12));
-                        usj_write("JIG: BOOT OK (DUT in bootloader, flash via CH340)\r\n");
+                        usj_write("JIG: BOOT OK (DUT in bootloader, use CH340 port to flash)\r\n");
                     } else if (!strcmp(cmd, "RUN")) {
                         usj_write("JIG: RUN start\r\n");
                         gpio_set_level(DUT_IO0_PIN, 1);
@@ -58,7 +58,7 @@ static void console_task(void *arg)
                         gpio_set_level(DUT_EN_PIN, 0);
                         vTaskDelay(pdMS_TO_TICKS(5));
                         gpio_set_level(DUT_EN_PIN, 1);
-                        usj_write("JIG: RUN OK (DUT running, read from CH340)\r\n");
+                        usj_write("JIG: RUN OK (DUT in application, read selftest from CH340 port)\r\n");
                     } else if (!strcmp(cmd, "RST")) {
                         usj_write("JIG: RST\r\n");
                         gpio_set_level(DUT_EN_PIN, 0);
@@ -106,8 +106,8 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usj_cfg));
 
-    // Start console task only (no UART bridge tasks)
+    // Start console task only
     xTaskCreate(console_task, "console", 4096, NULL, 5, NULL);
 
-    ESP_LOGI(TAG, "Control running. Use CH340 for DUT flash/monitor.");
+    ESP_LOGI(TAG, "Control console running. CH340 port is for direct DUT flash/monitor.");
 }
