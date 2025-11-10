@@ -20,6 +20,11 @@ static const char *TAG = "JIG";
 #define DUT_IO0_PIN         5
 #endif
 
+// IGN test output pin - 100ms toggle for optocoupler test
+#ifndef IGN_TEST_PIN
+#define IGN_TEST_PIN        13  // S3的GPIO13用于IGN光耦测试输出
+#endif
+
 // Helper: write to USB-Serial-JTAG console
 static void usj_write(const char *s)
 {
@@ -122,6 +127,20 @@ static void voltage_task(void *arg)
     }
 }
 
+// IGN test task - toggle IGN_TEST_PIN every 100ms for optocoupler test
+static void ign_test_task(void *arg)
+{
+    ESP_LOGI(TAG, ">>> IGN test task STARTING (GPIO%d) <<<", IGN_TEST_PIN);
+    usj_write("\r\n>>> IGN test task started, toggling every 100ms... <<<\r\n\r\n");
+    
+    int level = 0;
+    while (1) {
+        gpio_set_level(IGN_TEST_PIN, level);
+        level = !level;
+        vTaskDelay(pdMS_TO_TICKS(100));  // Toggle every 100ms
+    }
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "========================================");
@@ -132,7 +151,7 @@ void app_main(void)
 
     // Configure GPIOs
     gpio_config_t out_conf = {
-        .pin_bit_mask = (1ULL << DUT_EN_PIN) | (1ULL << DUT_IO0_PIN),
+        .pin_bit_mask = (1ULL << DUT_EN_PIN) | (1ULL << DUT_IO0_PIN) | (1ULL << IGN_TEST_PIN),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -141,6 +160,7 @@ void app_main(void)
     ESP_ERROR_CHECK(gpio_config(&out_conf));
     gpio_set_level(DUT_EN_PIN, 1);
     gpio_set_level(DUT_IO0_PIN, 1);
+    gpio_set_level(IGN_TEST_PIN, 0);  // IGN test pin starts LOW
 
     // USB-Serial-JTAG console
     usb_serial_jtag_driver_config_t usj_cfg = {
@@ -173,7 +193,17 @@ void app_main(void)
         ESP_LOGE(TAG, "FAILED to create voltage task!");
     }
 
+    // Start IGN test task (continuously toggle IGN_TEST_PIN every 100ms)
+    ESP_LOGI(TAG, "Creating IGN test task...");
+    ret = xTaskCreate(ign_test_task, "ign_test", 2048, NULL, 3, NULL);
+    if (ret == pdPASS) {
+        ESP_LOGI(TAG, "IGN test task created successfully");
+    } else {
+        ESP_LOGE(TAG, "FAILED to create IGN test task!");
+    }
+
     ESP_LOGI(TAG, "Control running. Commands: !BOOT !RUN !RST !VOLTAGE");
     ESP_LOGI(TAG, "Voltage auto-reading enabled (every 2 seconds)");
+    ESP_LOGI(TAG, "IGN test auto-toggling enabled (every 100ms on GPIO%d)", IGN_TEST_PIN);
     ESP_LOGI(TAG, "========================================");
 }
