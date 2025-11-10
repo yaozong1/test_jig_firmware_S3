@@ -152,7 +152,13 @@ void app_main(void)
     // Initialize voltage ADC module
     ESP_LOGI(TAG, "Initializing voltage ADC...");
     voltage_adc_init();
-    ESP_LOGI(TAG, "Voltage ADC initialized");
+    
+    // Load default calibration parameters
+    // 根据测试：AI1 读取 4801 mV (实际 4620 mV)，需要 -181 mV 校正
+    ESP_LOGI(TAG, "Loading calibration parameters...");
+    voltage_adc_load_default_calibration();
+    
+    ESP_LOGI(TAG, "Voltage ADC initialized with calibration");
 
     // Start console task
     ESP_LOGI(TAG, "Creating console task...");

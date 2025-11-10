@@ -1,0 +1,15 @@
+[1/9] Performing build step for 'bootloader'
+[1/1] cmd.exe /C "cd /D C:\Users\h1576\Desktop\Roam\pe_code\pe_board\tools\test_jig_firmware\build\bootloader\esp-idf\esptool_py && C:\Users\h1576\.espressif\python_env\idf5.0_py3.13_env\Scripts\python.exe C:/Users/h1576/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build/bootloader/bootloader.bin"
+Bootloader binary size 0x4f90 bytes. 0x3070 bytes (38%) free.
+[2/7] Building C object esp-idf/main/CMakeFiles/__idf_main.dir/voltage_adc.c.obj
+[3/7] Linking C static library esp-idf\main\libmain.a
+[4/7] Generating ld/sections.ld
+[5/7] Linking CXX executable test_jig.elf
+[6/7] Generating binary image from built executable
+esptool.py v4.7.0
+Creating esp32s3 image...
+Merged 2 ELF sections
+Successfully created esp32s3 image.
+Generated C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build/test_jig.bin
+[7/7] cmd.exe /C "cd /D C:\Users\h1576\Desktop\Roam\pe_code\pe_board\tools\test_jig_firmware\build\esp-idf\esptool_py && C:\Users\h1576\.espressif\python_env\idf5.0_py3.13_env\Scripts\python.exe C:/Users/h1576/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build/partition_table/partition-table.bin C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build/test_jig.bin"
+test_jig.bin binary size 0x38350 bytes. Smallest app partition is 0x100000 bytes. 0xc7cb0 bytes (78%) free.

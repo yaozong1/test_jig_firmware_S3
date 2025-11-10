@@ -14,6 +14,18 @@
 
 static const char *TAG = "VADC";
 
+// Per-channel calibration data (AI1-AI8)
+static voltage_cal_t channel_cal[VOLTAGE_CHANNEL_COUNT] = {
+    {1.0f, 0},  // AI1
+    {1.0f, 0},  // AI2
+    {1.0f, 0},  // AI3
+    {1.0f, 0},  // AI4
+    {1.0f, 0},  // AI5
+    {1.0f, 0},  // AI6
+    {1.0f, 0},  // AI7
+    {1.0f, 0},  // AI8
+};
+
 // Modbus RTU CRC16 calculation
 static uint16_t modbus_crc16(const uint8_t *buf, size_t len)
 {
@@ -59,16 +71,16 @@ bool voltage_adc_read_all(uint16_t voltages[8])
 {
     // Modbus RTU command: Read Holding Registers
     // Function code: 0x03
-    // K10-3U8 工程量寄存器地址: 40017-40020 (0x0010-0x0013) - 4个通道
-    // 或 40017-40024 (0x0010-0x0017) - 如果有8个通道
+    // K10-3U8 工程量寄存器地址: 40017-40024 (0x0010-0x0017)
     // 工程量采集：0~10V 直接对应 0~10000 (单位 mV)
     // 模拟量输入单位为 mV，不需要额外换算！
+    // 注意：AI1 通道存在硬件偏移，需要软件校准（约 -181 mV）
     
     uint8_t tx_buf[8];
     tx_buf[0] = VOLTAGE_MODBUS_ADDR;  // Slave address
     tx_buf[1] = 0x03;                 // Function code: Read Holding Registers
     tx_buf[2] = 0x00;                 // Start address high byte
-    tx_buf[3] = 0x10;                 // Start address low byte (0x0010 = 寄存器 40017)
+    tx_buf[3] = 0x10;                 // Start address low byte (0x0010 = 寄存器 40017 = AI1)
     tx_buf[4] = 0x00;                 // Register count high byte
     tx_buf[5] = 0x08;                 // Register count low byte (8 channels)
     
@@ -195,15 +207,61 @@ bool voltage_adc_read_all(uint16_t voltages[8])
             continue;
         }
         
-        // 工程量直接就是 mV 值，无需换算
-        voltages[i] = raw;
+        // 应用校准参数：calibrated = (raw * gain) + offset
+        int32_t calibrated = (int32_t)(raw * channel_cal[i].gain) + channel_cal[i].offset;
         
-        ESP_LOGI(TAG, "  AI%d: Raw=%5u (0x%04X) = %5u mV (%6.3f V)", 
-                 i + 1, raw, raw, voltages[i], voltages[i] / 1000.0);
+        // 限制在有效范围内 (0~10000 mV)
+        if (calibrated < 0) calibrated = 0;
+        if (calibrated > 10000) calibrated = 10000;
+        
+        voltages[i] = (uint16_t)calibrated;
+        
+        if (channel_cal[i].gain != 1.0f || channel_cal[i].offset != 0) {
+            ESP_LOGI(TAG, "  AI%d: Raw=%5u -> Calibrated=%5u mV (%6.3f V) [Gain=%.4f, Offset=%+d]", 
+                     i + 1, raw, voltages[i], voltages[i] / 1000.0, 
+                     channel_cal[i].gain, channel_cal[i].offset);
+        } else {
+            ESP_LOGI(TAG, "  AI%d: Raw=%5u = %5u mV (%6.3f V)", 
+                     i + 1, raw, voltages[i], voltages[i] / 1000.0);
+        }
     }
     ESP_LOGI(TAG, "======================");
     
     return true;
+}
+
+// Set calibration parameters for a specific channel
+void voltage_adc_set_calibration(uint8_t channel, float gain, int16_t offset_mv)
+{
+    if (channel >= VOLTAGE_CHANNEL_COUNT) {
+        ESP_LOGE(TAG, "Invalid channel %d (max: %d)", channel, VOLTAGE_CHANNEL_COUNT - 1);
+        return;
+    }
+    
+    channel_cal[channel].gain = gain;
+    channel_cal[channel].offset = offset_mv;
+    
+    ESP_LOGI(TAG, "Set calibration for AI%d: Gain=%.4f, Offset=%+d mV", 
+             channel + 1, gain, offset_mv);
+}
+
+// Load default calibration based on your test measurements
+// AI1 measured 4801 mV for 4620 mV input -> offset = -181 mV
+// AI4 measured 4612 mV for 4620 mV input -> offset = -8 mV (very close, within tolerance)
+void voltage_adc_load_default_calibration(void)
+{
+    ESP_LOGI(TAG, "Loading default calibration parameters...");
+    
+    // AI1: 需要 -181 mV 校正
+    voltage_adc_set_calibration(0, 1.0f, -181);
+    
+    // AI4: 仅偏差 -8 mV，可以忽略或校正
+    // voltage_adc_set_calibration(3, 1.0f, 8);  // 可选
+    
+    // 其他通道如果有测试数据，也可以添加校准参数
+    // 例如：voltage_adc_set_calibration(1, 1.0f, 0);
+    
+    ESP_LOGI(TAG, "Calibration loaded. Test your channels and adjust as needed.");
 }
 
 void voltage_adc_send_payload(const uint16_t voltages[8])
