@@ -12,6 +12,10 @@
 #include "driver/usb_serial_jtag.h"
 #include "esp_log.h"
 
+// 外部变量：IM测试结果（在main.c中定义）
+extern bool im_test_result;
+extern bool im_test_done;
+
 static const char *TAG = "VADC";
 
 // Per-channel calibration data (AI1-AI8)
@@ -266,15 +270,18 @@ void voltage_adc_load_default_calibration(void)
 
 void voltage_adc_send_payload(const uint16_t voltages[8])
 {
-    // Send as JSON payload via USB-Serial-JTAG
-    char payload[256];
+    // Send as JSON payload via USB-Serial-JTAG, including IM test result
+    char payload[300];
     int len = snprintf(payload, sizeof(payload),
         "VOLTAGE_ADC: {"
         "\"ch1\":%u,\"ch2\":%u,\"ch3\":%u,\"ch4\":%u,"
-        "\"ch5\":%u,\"ch6\":%u,\"ch7\":%u,\"ch8\":%u"
+        "\"ch5\":%u,\"ch6\":%u,\"ch7\":%u,\"ch8\":%u,"
+        "\"im_tested\":%s,\"im_pass\":%s"
         "}\r\n",
         voltages[0], voltages[1], voltages[2], voltages[3],
-        voltages[4], voltages[5], voltages[6], voltages[7]
+        voltages[4], voltages[5], voltages[6], voltages[7],
+        im_test_done ? "true" : "false",
+        im_test_result ? "true" : "false"
     );
     
     if (len > 0 && len < sizeof(payload)) {

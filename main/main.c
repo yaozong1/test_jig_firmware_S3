@@ -25,6 +25,11 @@ static const char *TAG = "JIG";
 #define IGN_TEST_PIN        13  // S3的GPIO13用于IGN光耦测试输出
 #endif
 
+// Immobilizer test input pin - detect DUT's IM_OUT
+#ifndef IM_IN_PIN
+#define IM_IN_PIN           12  // S3的GPIO12用于检测DUT的IM_OUT光耦输出
+#endif
+
 // Helper: write to USB-Serial-JTAG console
 static void usj_write(const char *s)
 {
@@ -141,6 +146,65 @@ static void ign_test_task(void *arg)
     }
 }
 
+// IM test task - detect IM_IN pin level changes from DUT's IM_OUT
+bool im_test_result = false;
+bool im_test_done = false;
+
+static void im_test_task(void *arg)
+{
+    ESP_LOGI(TAG, ">>> IM test task STARTING (GPIO%d) <<<", IM_IN_PIN);
+    usj_write("\r\n>>> IM test task started, detecting level changes... <<<\r\n\r\n");
+    
+    // 等待2秒让DUT启动
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    
+    // 持续循环测试,每5秒一次
+    while (1) {
+        int initial_level = gpio_get_level(IM_IN_PIN);
+        ESP_LOGI(TAG, "IM test: starting new round, initial level=%d", initial_level);
+        
+        // 简化逻辑：只要检测到电平变化(翻转)就算通过
+        // 不管初始是HIGH还是LOW,只需检测到: 当前电平 -> 反转 -> 再反转
+        int last_level = initial_level;
+        int toggle_count = 0;
+        
+        TickType_t start = xTaskGetTickCount();
+        TickType_t timeout = pdMS_TO_TICKS(5000);  // 5秒超时
+        
+        while ((xTaskGetTickCount() - start) < timeout) {
+            int level = gpio_get_level(IM_IN_PIN);
+            
+            if (level != last_level) {
+                toggle_count++;
+                ESP_LOGI(TAG, "IM test: toggle #%d, level %d->%d", toggle_count, last_level, level);
+                last_level = level;
+                
+                // 检测到至少2次翻转(一个完整周期)就算通过
+                if (toggle_count >= 2) {
+                    ESP_LOGI(TAG, "IM test: detected %d toggles, PASS!", toggle_count);
+                    im_test_result = true;
+                    im_test_done = true;
+                    usj_write("IM test: PASS\r\n");
+                    break;  // 退出内层循环,5秒后重新测试
+                }
+            }
+            
+            vTaskDelay(pdMS_TO_TICKS(10));  // 10ms轮询间隔
+        }
+        
+        // 超时则失败
+        if (toggle_count < 2) {
+            ESP_LOGW(TAG, "IM test: timeout, only detected %d toggles, FAIL", toggle_count);
+            usj_write("IM test: FAIL (timeout)\r\n");
+            im_test_result = false;
+            im_test_done = true;
+        }
+        
+        // 等待5秒后重新测试
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+}
+
 void app_main(void)
 {
     ESP_LOGI(TAG, "========================================");
@@ -161,6 +225,16 @@ void app_main(void)
     gpio_set_level(DUT_EN_PIN, 1);
     gpio_set_level(DUT_IO0_PIN, 1);
     gpio_set_level(IGN_TEST_PIN, 0);  // IGN test pin starts LOW
+
+    // Configure IM_IN as input with pull-up
+    gpio_config_t in_conf = {
+        .pin_bit_mask = (1ULL << IM_IN_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&in_conf));
 
     // USB-Serial-JTAG console
     usb_serial_jtag_driver_config_t usj_cfg = {
@@ -200,6 +274,15 @@ void app_main(void)
         ESP_LOGI(TAG, "IGN test task created successfully");
     } else {
         ESP_LOGE(TAG, "FAILED to create IGN test task!");
+    }
+
+    // Start IM test task (detect IM_IN level changes from DUT)
+    ESP_LOGI(TAG, "Creating IM test task...");
+    ret = xTaskCreate(im_test_task, "im_test", 2048, NULL, 3, NULL);
+    if (ret == pdPASS) {
+        ESP_LOGI(TAG, "IM test task created successfully");
+    } else {
+        ESP_LOGE(TAG, "FAILED to create IM test task!");
     }
 
     ESP_LOGI(TAG, "Control running. Commands: !BOOT !RUN !RST !VOLTAGE");
