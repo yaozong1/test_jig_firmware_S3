@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "driver/usb_serial_jtag.h"
 #include "voltage_adc.h"  // K10-3U8 voltage module
+#include "rs485_tx.h"
 
 static const char *TAG = "JIG";
 
@@ -246,6 +247,15 @@ void app_main(void)
     voltage_adc_load_default_calibration();
     
     ESP_LOGI(TAG, "Voltage ADC initialized with calibration");
+
+    // Initialize and start RS485 TX task (won't affect other functionality)
+    ESP_LOGI(TAG, "Initializing RS485 TX module...");
+    if (rs485_tx_init()) {
+        rs485_tx_start();
+        ESP_LOGI(TAG, "RS485 TX started");
+    } else {
+        ESP_LOGW(TAG, "RS485 TX init failed (RS485 disabled)");
+    }
 
     // Start console task
     ESP_LOGI(TAG, "Creating console task...");
