@@ -24,14 +24,15 @@ static const char *TAG = "CAN_TX";
 
 static bool s_can_inited = false;
 static TaskHandle_t s_tx_task_handle = NULL;
+static volatile int s_send_count = 0;  // Number of messages to send (0 = idle)
 
-// Periodic transmission task
+// On-demand transmission task (sends when triggered)
 static void can_tx_task(void *arg)
 {
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     
-    ESP_LOGI(TAG, ">>> CAN TX task STARTING <<<");
-    ESP_LOGI(TAG, "Sending: 01 02 03 04 05 06 07 08 every 1 second");
+    ESP_LOGI(TAG, ">>> CAN TX task STARTING (on-demand mode) <<<");
+    ESP_LOGI(TAG, "Will send 20 bursts when triggered by GUI_REQUEST_DATA");
     
     twai_message_t tx_msg;
     tx_msg.identifier = 0x100;  // CAN ID 0x100
@@ -41,17 +42,23 @@ static void can_tx_task(void *arg)
     memcpy(tx_msg.data, data, sizeof(data));
     
     while (1) {
-        // Send CAN message
-        esp_err_t ret = twai_transmit(&tx_msg, pdMS_TO_TICKS(100));
-        
-        if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "Sent: 01 02 03 04 05 06 07 08 (ID=0x100)");
+        if (s_send_count > 0) {
+            // Send CAN message
+            esp_err_t ret = twai_transmit(&tx_msg, pdMS_TO_TICKS(100));
+            
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "Sent [%d]: 01 02 03 04 05 06 07 08 (ID=0x100)", 21 - s_send_count);
+                s_send_count--;
+            } else {
+                ESP_LOGW(TAG, "Send failed: %s", esp_err_to_name(ret));
+                s_send_count--;  // Decrement anyway to avoid infinite loop
+            }
+            
+            vTaskDelay(pdMS_TO_TICKS(1000));  // 1 second between messages
         } else {
-            ESP_LOGW(TAG, "Send failed: %s", esp_err_to_name(ret));
+            // Idle, wait for trigger
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
-        
-        // Wait 1 second before next transmission
-        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -108,14 +115,21 @@ void can_tx_start(void)
         return;
     }
 
-    // Create periodic transmission task
-    BaseType_t ret = xTaskCreate(can_tx_task, "can_tx", 2048, NULL, 3, &s_tx_task_handle);
+    // Create on-demand transmission task with larger stack
+    BaseType_t ret = xTaskCreate(can_tx_task, "can_tx", 4096, NULL, 3, &s_tx_task_handle);
     if (ret == pdPASS) {
         ESP_LOGI(TAG, "CAN TX task created successfully");
     } else {
         ESP_LOGE(TAG, "Failed to create CAN TX task");
         s_tx_task_handle = NULL;
     }
+}
+
+void can_tx_trigger(void)
+{
+    // Trigger 20 message burst
+    s_send_count = 20;
+    ESP_LOGI(TAG, "Triggered: will send 20 messages");
 }
 
 void can_tx_stop(void)

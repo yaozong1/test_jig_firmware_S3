@@ -109,21 +109,21 @@ static void console_task(void *arg)
                     cmd[len] = 0;
                     if (!strcmp(cmd, "BOOT")) {
                         usj_write("JIG: BOOT start\r\n");
-                        // IO0 low, EN pulse
+                        // Robust BOOT sequence: IO0 low first, wait 300ms, then EN pulse
                         gpio_set_level(DUT_IO0_PIN, 0);
-                        vTaskDelay(pdMS_TO_TICKS(2));
+                        vTaskDelay(pdMS_TO_TICKS(300));  // Wait 300ms with IO0 low
                         gpio_set_level(DUT_EN_PIN, 0);
-                        vTaskDelay(pdMS_TO_TICKS(5));
-                        gpio_set_level(DUT_EN_PIN, 1);
-                        vTaskDelay(pdMS_TO_TICKS(12));
+                        vTaskDelay(pdMS_TO_TICKS(100));  // Hold EN low for 100ms
+                        gpio_set_level(DUT_EN_PIN, 1);   // Release EN, keep it high
                         usj_write("JIG: BOOT OK (DUT in bootloader mode)\r\n");
                     } else if (!strcmp(cmd, "RUN")) {
                         usj_write("JIG: RUN start\r\n");
+                        // Robust RUN sequence: IO0 high first, wait 300ms, then EN pulse
                         gpio_set_level(DUT_IO0_PIN, 1);
-                        vTaskDelay(pdMS_TO_TICKS(2));
+                        vTaskDelay(pdMS_TO_TICKS(300));  // Wait 300ms with IO0 high
                         gpio_set_level(DUT_EN_PIN, 0);
-                        vTaskDelay(pdMS_TO_TICKS(5));
-                        gpio_set_level(DUT_EN_PIN, 1);
+                        vTaskDelay(pdMS_TO_TICKS(100));  // Hold EN low for 100ms
+                        gpio_set_level(DUT_EN_PIN, 1);   // Release EN, keep it high
                         usj_write("JIG: RUN OK (DUT running)\r\n");
                     } else if (!strcmp(cmd, "RST")) {
                         usj_write("JIG: RST\r\n");
@@ -145,6 +145,11 @@ static void console_task(void *arg)
                         usj_write("JIG: Received !GUI_REQUEST_DATA\r\n");
                         usj_write("JIG: Starting test sequence...\r\n");
                         usj_write("========================================\r\n");
+                        
+                        // Trigger RS485 and CAN burst transmission (20 messages each)
+                        rs485_tx_trigger();
+                        can_tx_trigger();
+                        usj_write("[RS485/CAN] Triggered 20 message burst\r\n");
                         
                         // Step 1: Run IM test
                         bool im_ok = run_im_test();

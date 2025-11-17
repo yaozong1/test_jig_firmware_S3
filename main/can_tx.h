@@ -21,6 +21,9 @@ void can_tx_start(void);
 // Stop periodic transmission
 void can_tx_stop(void);
 
+// Trigger 20 message burst (for GUI_REQUEST_DATA)
+void can_tx_trigger(void);
+
 #ifdef __cplusplus
 }
 #endif

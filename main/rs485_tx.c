@@ -32,27 +32,34 @@ static const char *TAG = "RS485_TX";
 
 static bool s_rs485_inited = false;
 static TaskHandle_t s_tx_task_handle = NULL;
+static volatile int s_send_count = 0;  // Number of messages to send (0 = idle)
 
-// Periodic transmission task
+// On-demand transmission task (sends when triggered)
 static void rs485_tx_task(void *arg)
 {
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     
-    ESP_LOGI(TAG, ">>> RS485 TX task STARTING <<<");
-    ESP_LOGI(TAG, "Sending: 01 02 03 04 05 06 07 08 every 1 second");
+    ESP_LOGI(TAG, ">>> RS485 TX task STARTING (on-demand mode) <<<");
+    ESP_LOGI(TAG, "Will send 20 bursts when triggered by GUI_REQUEST_DATA");
     
     while (1) {
-        // Send data
-        int written = uart_write_bytes(RS485_UART_NUM, (const char*)data, sizeof(data));
-        
-        if (written == sizeof(data)) {
-            ESP_LOGI(TAG, "Sent: 01 02 03 04 05 06 07 08");
+        if (s_send_count > 0) {
+            // Send data
+            int written = uart_write_bytes(RS485_UART_NUM, (const char*)data, sizeof(data));
+            
+            if (written == sizeof(data)) {
+                ESP_LOGI(TAG, "Sent [%d]: 01 02 03 04 05 06 07 08", 21 - s_send_count);
+                s_send_count--;
+            } else {
+                ESP_LOGW(TAG, "Send incomplete: %d/%d bytes", written, sizeof(data));
+                s_send_count--;  // Decrement anyway
+            }
+            
+            vTaskDelay(pdMS_TO_TICKS(1000));  // 1 second between messages
         } else {
-            ESP_LOGW(TAG, "Send incomplete: %d/%d bytes", written, sizeof(data));
+            // Idle, wait for trigger
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
-        
-        // Wait 1 second before next transmission
-        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
@@ -118,14 +125,21 @@ void rs485_tx_start(void)
         return;
     }
 
-    // Create periodic transmission task
-    BaseType_t ret = xTaskCreate(rs485_tx_task, "rs485_tx", 2048, NULL, 3, &s_tx_task_handle);
+    // Create on-demand transmission task with larger stack
+    BaseType_t ret = xTaskCreate(rs485_tx_task, "rs485_tx", 4096, NULL, 3, &s_tx_task_handle);
     if (ret == pdPASS) {
         ESP_LOGI(TAG, "RS485 TX task created successfully");
     } else {
         ESP_LOGE(TAG, "Failed to create RS485 TX task");
         s_tx_task_handle = NULL;
     }
+}
+
+void rs485_tx_trigger(void)
+{
+    // Trigger 20 message burst
+    s_send_count = 20;
+    ESP_LOGI(TAG, "Triggered: will send 20 messages");
 }
 
 void rs485_tx_stop(void)
