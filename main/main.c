@@ -10,6 +10,7 @@
 #include "driver/usb_serial_jtag.h"
 #include "voltage_adc.h"  // K10-3U8 voltage module
 #include "rs485_tx.h"
+#include "can_tx.h"
 
 static const char *TAG = "JIG";
 
@@ -255,6 +256,15 @@ void app_main(void)
         ESP_LOGI(TAG, "RS485 TX started");
     } else {
         ESP_LOGW(TAG, "RS485 TX init failed (RS485 disabled)");
+    }
+
+    // Initialize and start CAN TX task (sends 01..08 periodically)
+    ESP_LOGI(TAG, "Initializing CAN TX module...");
+    if (can_tx_init()) {
+        can_tx_start();
+        ESP_LOGI(TAG, "CAN TX started");
+    } else {
+        ESP_LOGW(TAG, "CAN TX init failed (CAN disabled)");
     }
 
     // Start console task
