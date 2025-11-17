@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "test_jig",
-    "project_version":    "10b9c34-dirty",
+    "project_version":    "ce54668-dirty",
     "project_path":       "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware",
     "idf_path":           "C:/Users/h1576/esp/esp-idf",
     "build_dir":          "C:/Users/h1576/Desktop/Roam/pe_code/pe_board/tools/test_jig_firmware/build",

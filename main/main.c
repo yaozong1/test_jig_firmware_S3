@@ -109,12 +109,17 @@ static void console_task(void *arg)
                     cmd[len] = 0;
                     if (!strcmp(cmd, "BOOT")) {
                         usj_write("JIG: BOOT start\r\n");
-                        // Robust BOOT sequence: IO0 low first, wait 300ms, then EN pulse
+                        // Robust BOOT sequence for download mode:
+                        // 1. Pull IO0 low immediately and hold 200ms
                         gpio_set_level(DUT_IO0_PIN, 0);
-                        vTaskDelay(pdMS_TO_TICKS(300));  // Wait 300ms with IO0 low
+                        vTaskDelay(pdMS_TO_TICKS(200));  // IO0 stays low for 200ms
+                        // 2. Pull EN low for 300ms (reset pulse)
                         gpio_set_level(DUT_EN_PIN, 0);
-                        vTaskDelay(pdMS_TO_TICKS(100));  // Hold EN low for 100ms
-                        gpio_set_level(DUT_EN_PIN, 1);   // Release EN, keep it high
+                        vTaskDelay(pdMS_TO_TICKS(300));  // EN low for 300ms
+                        gpio_set_level(DUT_EN_PIN, 1);   // Release EN (goes high)
+                        // 3. Wait another 300ms, then pull IO0 high
+                        vTaskDelay(pdMS_TO_TICKS(300));  // Keep IO0 low for 300ms after EN high
+                        gpio_set_level(DUT_IO0_PIN, 1);  // Finally release IO0
                         usj_write("JIG: BOOT OK (DUT in bootloader mode)\r\n");
                     } else if (!strcmp(cmd, "RUN")) {
                         usj_write("JIG: RUN start\r\n");
@@ -122,7 +127,7 @@ static void console_task(void *arg)
                         gpio_set_level(DUT_IO0_PIN, 1);
                         vTaskDelay(pdMS_TO_TICKS(300));  // Wait 300ms with IO0 high
                         gpio_set_level(DUT_EN_PIN, 0);
-                        vTaskDelay(pdMS_TO_TICKS(100));  // Hold EN low for 100ms
+                        vTaskDelay(pdMS_TO_TICKS(300));  // Hold EN low for 300ms
                         gpio_set_level(DUT_EN_PIN, 1);   // Release EN, keep it high
                         usj_write("JIG: RUN OK (DUT running)\r\n");
                     } else if (!strcmp(cmd, "RST")) {
@@ -213,7 +218,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Voltage  : UART1 TX=%d RX=%d", VOLTAGE_UART_TX, VOLTAGE_UART_RX);
     ESP_LOGI(TAG, "========================================");
 
-    // Configure GPIOs
+    // Configure GPIOs (Push-Pull Output mode)
     gpio_config_t out_conf = {
         .pin_bit_mask = (1ULL << DUT_EN_PIN) | (1ULL << DUT_IO0_PIN) | (1ULL << IGN_TEST_PIN),
         .mode = GPIO_MODE_OUTPUT,
@@ -221,7 +226,11 @@ void app_main(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
+    // Set drive strength to maximum for push-pull output
     ESP_ERROR_CHECK(gpio_config(&out_conf));
+    ESP_ERROR_CHECK(gpio_set_drive_capability(DUT_EN_PIN, GPIO_DRIVE_CAP_3));
+    ESP_ERROR_CHECK(gpio_set_drive_capability(DUT_IO0_PIN, GPIO_DRIVE_CAP_3));
+    ESP_ERROR_CHECK(gpio_set_drive_capability(IGN_TEST_PIN, GPIO_DRIVE_CAP_3));
     gpio_set_level(DUT_EN_PIN, 1);
     gpio_set_level(DUT_IO0_PIN, 1);
     gpio_set_level(IGN_TEST_PIN, 0);  // IGN test pin starts LOW
