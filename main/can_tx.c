@@ -32,7 +32,6 @@ static void can_tx_task(void *arg)
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     
     ESP_LOGI(TAG, ">>> CAN TX task STARTING (on-demand mode) <<<");
-    ESP_LOGI(TAG, "Will send 20 bursts when triggered by GUI_REQUEST_DATA");
     
     twai_message_t tx_msg;
     tx_msg.identifier = 0x100;  // CAN ID 0x100
@@ -43,18 +42,30 @@ static void can_tx_task(void *arg)
     
     while (1) {
         if (s_send_count > 0) {
-            // Send CAN message
-            esp_err_t ret = twai_transmit(&tx_msg, pdMS_TO_TICKS(100));
+            int total_to_send = s_send_count;
             
-            if (ret == ESP_OK) {
-                ESP_LOGI(TAG, "Sent [%d]: 01 02 03 04 05 06 07 08 (ID=0x100)", 21 - s_send_count);
+            // Print start message once
+            ESP_LOGI(TAG, "Start sending CAN \"01~08\" (ID=0x100, %d messages)", total_to_send);
+            
+            // Send all messages
+            while (s_send_count > 0) {
+                esp_err_t ret = twai_transmit(&tx_msg, pdMS_TO_TICKS(100));
+                
+                // 注释掉超时日志,避免刷屏
+                // if (ret != ESP_OK) {
+                //     ESP_LOGW(TAG, "Send failed: %s", esp_err_to_name(ret));
+                // }
+                (void)ret;  // Suppress unused variable warning
+                
                 s_send_count--;
-            } else {
-                ESP_LOGW(TAG, "Send failed: %s", esp_err_to_name(ret));
-                s_send_count--;  // Decrement anyway to avoid infinite loop
+                
+                if (s_send_count > 0) {
+                    vTaskDelay(pdMS_TO_TICKS(100));  // 100ms between messages
+                }
             }
             
-            vTaskDelay(pdMS_TO_TICKS(1000));  // 1 second between messages
+            // Print done message once
+            ESP_LOGI(TAG, "Done CAN (%d messages sent)", total_to_send);
         } else {
             // Idle, wait for trigger
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -127,9 +138,8 @@ void can_tx_start(void)
 
 void can_tx_trigger(void)
 {
-    // Trigger 20 message burst
+    // Trigger 20 message burst (100ms interval, total 2 seconds)
     s_send_count = 20;
-    ESP_LOGI(TAG, "Triggered: will send 20 messages");
 }
 
 void can_tx_stop(void)

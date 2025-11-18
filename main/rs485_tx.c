@@ -40,22 +40,31 @@ static void rs485_tx_task(void *arg)
     const uint8_t data[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     
     ESP_LOGI(TAG, ">>> RS485 TX task STARTING (on-demand mode) <<<");
-    ESP_LOGI(TAG, "Will send 20 bursts when triggered by GUI_REQUEST_DATA");
     
     while (1) {
         if (s_send_count > 0) {
-            // Send data
-            int written = uart_write_bytes(RS485_UART_NUM, (const char*)data, sizeof(data));
+            int total_to_send = s_send_count;
             
-            if (written == sizeof(data)) {
-                ESP_LOGI(TAG, "Sent [%d]: 01 02 03 04 05 06 07 08", 21 - s_send_count);
+            // Print start message once
+            ESP_LOGI(TAG, "Start sending RS485 \"01~08\" (%d messages)", total_to_send);
+            
+            // Send all messages
+            while (s_send_count > 0) {
+                int written = uart_write_bytes(RS485_UART_NUM, (const char*)data, sizeof(data));
+                
+                if (written != sizeof(data)) {
+                    ESP_LOGW(TAG, "Send incomplete: %d/%d bytes", written, sizeof(data));
+                }
+                
                 s_send_count--;
-            } else {
-                ESP_LOGW(TAG, "Send incomplete: %d/%d bytes", written, sizeof(data));
-                s_send_count--;  // Decrement anyway
+                
+                if (s_send_count > 0) {
+                    vTaskDelay(pdMS_TO_TICKS(100));  // 100ms between messages
+                }
             }
             
-            vTaskDelay(pdMS_TO_TICKS(1000));  // 1 second between messages
+            // Print done message once
+            ESP_LOGI(TAG, "Done RS485 (%d messages sent)", total_to_send);
         } else {
             // Idle, wait for trigger
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -137,9 +146,8 @@ void rs485_tx_start(void)
 
 void rs485_tx_trigger(void)
 {
-    // Trigger 20 message burst
-    s_send_count = 20;
-    ESP_LOGI(TAG, "Triggered: will send 20 messages");
+    // Trigger 100 message burst (100ms interval, total 10 seconds)
+    s_send_count = 100;
 }
 
 void rs485_tx_stop(void)
