@@ -14042,9 +14042,8 @@ LOAD c:/users/h1576/.espressif/tools/xtensa-esp32s3-elf/esp-2022r1-11.2.0/xtensa
                 0x0000000042007a88                can_tx_start
  *fill*         0x0000000042007b31        0x3 
  .text.can_tx_trigger
-                0x0000000042007b34        0xf esp-idf/main/libmain.a(can_tx.c.obj)
+                0x0000000042007b34       0x10 esp-idf/main/libmain.a(can_tx.c.obj)
                 0x0000000042007b34                can_tx_trigger
- *fill*         0x0000000042007b43        0x1 
  .text.rs485_tx_task
                 0x0000000042007b44       0xdf esp-idf/main/libmain.a(rs485_tx.c.obj)
  *fill*         0x0000000042007c23        0x1 
@@ -14889,7 +14888,6 @@ LOAD c:/users/h1576/.espressif/tools/xtensa-esp32s3-elf/esp-2022r1-11.2.0/xtensa
  *fill*         0x000000004201be2d        0x3 
  .text.usb_serial_jtag_close
                 0x000000004201be30        0x7 esp-idf/vfs/libvfs.a(vfs_usb_serial_jtag.c.obj)
- *fill*         0x000000004201be37        0x0 
  *fill*         0x000000004201be37        0x0 
  *fill*         0x000000004201be37        0x0 
  *fill*         0x000000004201be37        0x0 

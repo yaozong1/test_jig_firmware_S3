@@ -49,7 +49,7 @@ static void can_tx_task(void *arg)
             
             // Send all messages
             while (s_send_count > 0) {
-                esp_err_t ret = twai_transmit(&tx_msg, pdMS_TO_TICKS(100));
+                esp_err_t ret = twai_transmit(&tx_msg, pdMS_TO_TICKS(20));  // 超时20ms
                 
                 // 注释掉超时日志,避免刷屏
                 // if (ret != ESP_OK) {
@@ -60,7 +60,7 @@ static void can_tx_task(void *arg)
                 s_send_count--;
                 
                 if (s_send_count > 0) {
-                    vTaskDelay(pdMS_TO_TICKS(100));  // 100ms between messages
+                    vTaskDelay(pdMS_TO_TICKS(100));  // 100ms间隔
                 }
             }
             
@@ -138,8 +138,8 @@ void can_tx_start(void)
 
 void can_tx_trigger(void)
 {
-    // Trigger 20 message burst (100ms interval, total 2 seconds)
-    s_send_count = 20;
+    // Trigger 100 message burst (100ms interval, total 10 seconds)
+    s_send_count = 100;
 }
 
 void can_tx_stop(void)
