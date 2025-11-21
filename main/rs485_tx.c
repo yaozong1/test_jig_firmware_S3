@@ -17,11 +17,11 @@ static const char *TAG = "RS485_TX";
 #endif
 
 #ifndef RS485_TX_PIN
-#define RS485_TX_PIN        15  // S3 GPIO15 for RS485 TX
+#define RS485_TX_PIN        15  // S3 GPIO15 for RS485 RXpin
 #endif
 
-#ifndef RS485_RX_PIN
-#define RS485_RX_PIN        16  // S3 GPIO16 for RS485 RX
+#ifndef RS485_RX_PIN 
+#define RS485_RX_PIN        16  // S3 GPIO16 for RS485 TXpin
 #endif
 
 #ifndef RS485_BAUDRATE
