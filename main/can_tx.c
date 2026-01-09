@@ -150,3 +150,103 @@ void can_tx_stop(void)
         ESP_LOGI(TAG, "CAN TX task stopped");
     }
 }
+
+bool can_tx_force_reset(void)
+{
+    ESP_LOGI(TAG, "Force resetting CAN controller...");
+    
+    // Stop TX task first
+    can_tx_stop();
+    
+    // Check current status before reset
+    twai_status_info_t status;
+    if (twai_get_status_info(&status) == ESP_OK) {
+        ESP_LOGI(TAG, "Before reset - State: %lu, TX_ERR: %lu, RX_ERR: %lu", 
+                 (unsigned long)status.state, (unsigned long)status.tx_error_counter, (unsigned long)status.rx_error_counter);
+    }
+    
+    // Stop and uninstall driver
+    esp_err_t ret = twai_stop();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "TWAI stop failed: %s", esp_err_to_name(ret));
+    }
+    
+    ret = twai_driver_uninstall();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "TWAI uninstall failed: %s", esp_err_to_name(ret));
+    }
+    
+    s_can_inited = false;
+    
+    // Small delay to ensure hardware state clears
+    vTaskDelay(pdMS_TO_TICKS(10));
+    
+    // Reinitialize with same configuration as original init
+    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
+    g_config.intr_flags = 0;
+    
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_250KBITS();
+    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+    
+    // Reinstall driver
+    ret = twai_driver_install(&g_config, &t_config, &f_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to reinstall TWAI driver: %s", esp_err_to_name(ret));
+        return false;
+    }
+    
+    // Restart driver
+    ret = twai_start();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to restart TWAI driver: %s", esp_err_to_name(ret));
+        twai_driver_uninstall();
+        return false;
+    }
+    
+    s_can_inited = true;
+    
+    // Check new status after reset
+    if (twai_get_status_info(&status) == ESP_OK) {
+        ESP_LOGI(TAG, "After reset - State: %lu, TX_ERR: %lu, RX_ERR: %lu", 
+                 (unsigned long)status.state, (unsigned long)status.tx_error_counter, (unsigned long)status.rx_error_counter);
+    }
+    
+    // Restart TX task
+    can_tx_start();
+    
+    ESP_LOGI(TAG, "CAN controller force reset completed successfully");
+    return true;
+}
+
+void can_tx_check_status(void)
+{
+    if (!s_can_inited) {
+        ESP_LOGW(TAG, "CAN not initialized");
+        return;
+    }
+    
+    twai_status_info_t status;
+    esp_err_t ret = twai_get_status_info(&status);
+    if (ret == ESP_OK) {
+        const char* state_str;
+        switch (status.state) {
+            case TWAI_STATE_STOPPED: state_str = "STOPPED"; break;
+            case TWAI_STATE_RUNNING: state_str = "RUNNING"; break;
+            case TWAI_STATE_BUS_OFF: state_str = "BUS_OFF"; break;
+            case TWAI_STATE_RECOVERING: state_str = "RECOVERING"; break;
+            default: state_str = "UNKNOWN"; break;
+        }
+        
+        ESP_LOGI(TAG, "CAN Status - State: %s, TX_ERR: %lu, RX_ERR: %lu, TX_Q: %lu, RX_Q: %lu", 
+                 state_str, (unsigned long)status.tx_error_counter, (unsigned long)status.rx_error_counter,
+                 (unsigned long)status.msgs_to_tx, (unsigned long)status.msgs_to_rx);
+                 
+        // Auto-reset if Bus-Off detected
+        if (status.state == TWAI_STATE_BUS_OFF) {
+            ESP_LOGW(TAG, "Bus-Off state detected, triggering auto-reset...");
+            can_tx_force_reset();
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to get CAN status: %s", esp_err_to_name(ret));
+    }
+}

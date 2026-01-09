@@ -151,15 +151,19 @@ static void console_task(void *arg)
                         usj_write("JIG: Starting test sequence...\r\n");
                         usj_write("========================================\r\n");
                         
-                        // Trigger RS485 and CAN burst transmission (20 messages each)
+                        // Step 0: Check and reset CAN status before sending (prevent Bus-Off persistence)
+                        usj_write("[CAN] Pre-test status check...\r\n");
+                        can_tx_check_status();
+                        
+                        // Step 1: Trigger RS485 and CAN burst transmission (20 messages each)
                         rs485_tx_trigger();
                         can_tx_trigger();
                         usj_write("[RS485/CAN] Triggered 20 message burst\r\n");
                         
-                        // Step 1: Run IM test
+                        // Step 2: Run IM test
                         bool im_ok = run_im_test();
                         
-                        // Step 2: Read voltage
+                        // Step 3: Read voltage
                         usj_write("\r\n[VOLTAGE ADC] Starting...\r\n");
                         uint16_t voltages[8] = {0};
                         bool voltage_ok = voltage_adc_read_all(voltages);

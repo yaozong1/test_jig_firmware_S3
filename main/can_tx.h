@@ -24,6 +24,13 @@ void can_tx_stop(void);
 // Trigger 20 message burst (for GUI_REQUEST_DATA)
 void can_tx_trigger(void);
 
+// Force reset CAN controller to clear any error states (Bus-Off, etc.)
+// Returns true on success
+bool can_tx_force_reset(void);
+
+// Check CAN controller status
+void can_tx_check_status(void);
+
 #ifdef __cplusplus
 }
 #endif
